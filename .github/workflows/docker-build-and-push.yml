@@ -1,0 +1,51 @@
+name: Push Docker image to GHCR
+
+on:
+  push:
+    branches: [ feature/** ]
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions: write-all
+
+    steps:
+    - name: Set up a Git safe directory
+      run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+    - name: Check out the repo
+      uses: actions/checkout@v4
+
+    - run: git remote -v
+
+    - name: Get the GitHub App token
+      id: get_github_app_token
+      uses: getsentry/action-github-app-token@v2
+      with:
+        app_id: ${{ secrets.APP_ID }}
+        private_key: ${{ secrets.PRIVATE_KEY }}
+
+    - name: Log in to the GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PAT }}
+
+    - uses: sug1t0m0/set-incremented-semver-action@0.0.14
+      id: set_incremented_semver
+      with:
+        method: minor
+
+    - run: |
+        echo "incremented_semver=${{ steps.set_incremented_semver.outputs.method }}"
+        echo "incremented_semver=${{ steps.set_incremented_semver.outputs.currentVersion }}"
+        echo "incremented_semver=${{ steps.set_incremented_semver.outputs.nextVersion }}"
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ghcr.io/sug1t0m0/semver-incrementer:latest
